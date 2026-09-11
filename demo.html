@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Chat do agente de tickets</title>
+    <style>
+      :root { font-family: system-ui, sans-serif; color: #17202a; background: #f3f5f7; }
+      body { max-width: 760px; margin: 40px auto; padding: 0 20px; }
+      main { background: white; padding: 28px; border-radius: 12px; box-shadow: 0 4px 18px #00000012; }
+      h1 { margin-top: 0; font-size: 1.55rem; }
+      label { display: block; margin: 16px 0 6px; font-weight: 600; }
+      input, textarea, select, button { box-sizing: border-box; width: 100%; padding: 10px; border: 1px solid #c9d1d9; border-radius: 7px; font: inherit; }
+      textarea { min-height: 110px; resize: vertical; }
+      button { margin-top: 20px; color: white; background: #1769aa; border: 0; cursor: pointer; }
+      button:disabled { opacity: .65; cursor: wait; }
+      pre { white-space: pre-wrap; overflow-wrap: anywhere; background: #17202a; color: #e8f1f8; padding: 16px; border-radius: 7px; min-height: 30px; }
+      .hint { color: #5c6770; font-size: .92rem; }
+    .chat { display: flex; flex-direction: column; gap: 10px; min-height: 150px; margin: 18px 0; } .message { max-width: 85%; padding: 11px 14px; border-radius: 12px; white-space: pre-wrap; } .user { align-self: flex-end; background: #d9edff; } .agent { align-self: flex-start; background: #eef1f3; }.chat { display: flex; flex-direction: column; gap: 10px; min-height: 150px; margin: 18px 0; } .message { max-width: 85%; padding: 11px 14px; border-radius: 12px; white-space: pre-wrap; } .user { align-self: flex-end; background: #d9edff; } .agent { align-self: flex-start; background: #eef1f3; }</style>
+  </head>
+  <body>
+    <main>
+      <h1>Chat do agente de tickets</h1>
+      <p class="hint">Escreva o problema. O agente consulta o cliente e cria um ticket real.</p><div id="chat" class="chat"><div class="message agent">Olá! Descreva o problema que precisa virar um chamado.</div></div>
+      <div id="chat" class="chat"><div class="message agent">Olá! Descreva o problema que precisa virar um chamado.</div></div><form id="ticket-form">
+        <label for="email">E-mail do cliente</label>
+        <input id="email" type="email" value="ana@example.com" required />
+        <label for="title">Título do chamado</label>
+        <input id="title" minlength="5" maxlength="120" value="Falha no acesso" required />
+        <label for="description">Mensagem</label>
+        <textarea id="description" minlength="10" maxlength="2000" required>A cliente não consegue entrar no portal desde esta manhã.</textarea>
+        <label for="priority">Prioridade</label>
+        <select id="priority"><option value="low">Baixa</option><option value="medium">Média</option><option value="high" selected>Alta</option></select>
+        <button id="submit" type="submit">Enviar mensagem</button>
+      </form>
+      <h2>Resultado estruturado</h2>
+      <pre id="result">Preencha o formulário e clique em “Criar ticket”.</pre>
+    </main>
+    <script>
+      const form = document.querySelector("#ticket-form");
+      const button = document.querySelector("#submit");
+      const result = document.querySelector("#result"); const chat = document.querySelector("#chat"); const addMessage = (text, role) => { const message = document.createElement("div"); message.className = "message " + role; message.textContent = text; chat.appendChild(message); };
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        button.disabled = true; const description = document.querySelector("#description").value; addMessage(description, "user"); addMessage("Consultando cliente e criando ticket...", "agent");
+        result.textContent = "Executando lookup_customer e create_ticket...";
+        const body = {
+          customer_email: document.querySelector("#email").value,
+          title: document.querySelector("#title").value,
+          description: document.querySelector("#description").value,
+          priority: document.querySelector("#priority").value,
+        };
+        try {
+          const apiUrl = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1" ? "http://localhost:8080" : "https://big-step-01-agent.fly.dev";
+          const response = await fetch(apiUrl + "/runs", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+          result.textContent = JSON.stringify(await response.json(), null, 2);
+        } catch (error) {
+          result.textContent = "Não foi possível conectar ao agente: " + error.message;
+        } finally { button.disabled = false; }
+      });
+    </script>
+  </body>
+</html>
+
+
+
+

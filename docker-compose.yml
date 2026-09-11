@@ -1,0 +1,60 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: tickets
+      POSTGRES_USER: tickets
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-local-dev-password}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tickets -d tickets"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  ticket-system:
+    build:
+      context: .
+      dockerfile: Dockerfile.tickets
+    environment:
+      DATABASE_URL: postgresql://tickets:${POSTGRES_PASSWORD:-local-dev-password}@postgres:5432/tickets
+      SERVICE_TOKEN: ${SERVICE_TOKEN:-local-service-token}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8081:8081"
+
+  agent:
+    build:
+      context: .
+      dockerfile: Dockerfile.agent
+    environment:
+      OPENAI_API_KEY: ${OPENAI_API_KEY:?Defina OPENAI_API_KEY no arquivo .env}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.groq.com/openai/v1}
+      OPENAI_MODEL: ${OPENAI_MODEL:-openai/gpt-oss-20b}
+      TICKET_API_URL: http://ticket-system:8081
+      TICKET_SERVICE_TOKEN: ${SERVICE_TOKEN:-local-service-token}
+      TOOL_TIMEOUT_SECONDS: ${TOOL_TIMEOUT_SECONDS:-4}
+      TOOL_RETRY_ATTEMPTS: ${TOOL_RETRY_ATTEMPTS:-3}
+      OPENAI_INPUT_USD_PER_1M: ${OPENAI_INPUT_USD_PER_1M:-0.075}
+      OPENAI_OUTPUT_USD_PER_1M: ${OPENAI_OUTPUT_USD_PER_1M:-0.30}
+    depends_on:
+      ticket-system:
+        condition: service_started
+    ports:
+      - "8080:8080"
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    depends_on:
+      agent:
+        condition: service_started
+    ports:
+      - "5500:80"
+
+volumes:
+  postgres_data:

@@ -1,0 +1,18 @@
+app = "big-step-01-postgres"
+primary_region = "iad"
+
+[build]
+  image = "postgres:16-alpine"
+
+[env]
+  POSTGRES_DB = "tickets"
+  POSTGRES_USER = "tickets"
+  PGDATA = "/var/lib/postgresql/data/pgdata"
+
+[[mounts]]
+  source = "postgres_data"
+  destination = "/var/lib/postgresql/data"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"

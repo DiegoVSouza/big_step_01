@@ -1,0 +1,26 @@
+app = "big-step-01-agent"
+primary_region = "iad"
+
+[build]
+  dockerfile = "Dockerfile.agent"
+
+[env]
+  OPENAI_BASE_URL = "https://api.groq.com/openai/v1"
+  OPENAI_MODEL = "openai/gpt-oss-20b"
+  TICKET_API_URL = "http://big-step-01-tickets.internal:8081"
+  TOOL_TIMEOUT_SECONDS = "4"
+  TOOL_RETRY_ATTEMPTS = "3"
+  OPENAI_INPUT_USD_PER_1M = "0.075"
+  OPENAI_OUTPUT_USD_PER_1M = "0.30"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ["app"]
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"
