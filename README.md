@@ -1,6 +1,6 @@
 # Big Step 01 — agente que executa ação externa
 
-O projeto recebe uma ordem estruturada para abrir um chamado. Ele usa tool calling de uma API compatível com OpenAI e executa uma ação persistente em outro serviço: o `ticket-system`. Não há endpoint de conversa livre.
+O projeto recebe uma ordem estruturada para abrir um chamado. Ele usa tool calling de uma API compatível com OpenAI e executa uma ação persistente em outro serviço: o `ticket-system`. O endpoint `/chat` aceita mensagens livres e usa o mesmo fluxo operacional de tools.
 
 O modelo deve chamar, nesta ordem:
 
@@ -89,7 +89,7 @@ Com os containers em execução, sirva a página de teste em outro terminal:
 docker compose up --build -d
 ```
 
-Abra http://localhost:5500. A interface envia o formulário para `/runs` e mostra o resultado estruturado, as duas tools executadas, os tokens e o custo estimado.
+Abra http://localhost:5500. A interface envia mensagens para `/chat`, mostra o andamento da operação e exibe o resultado estruturado, as duas tools executadas, os tokens e o custo estimado.
 
 ## Deploy e variáveis
 
@@ -104,3 +104,14 @@ Para publicar:
 O script não imprime os valores das credenciais. Se `POSTGRES_PASSWORD` ou `SERVICE_TOKEN` não forem definidos, ele gera credenciais internas aleatórias.
 
 
+
+
+## Fluxo conversacional
+
+O endpoint `/chat` aceita uma mensagem livre e mantém o histórico enviado pelo frontend. O agente segue esta sequência:
+
+1. `search_help_articles`: pesquisa orientações internas relacionadas ao problema.
+2. `lookup_customer`: confirma o cliente quando encontra um e-mail na conversa.
+3. `create_ticket`: grava o chamado usando os dados extraídos e o `customer_id` confirmado.
+
+Se a mensagem não tiver e-mail, o agente pesquisa os artigos e pede somente a informação necessária, sem inventar um cliente. A interface possui mensagens prontas para testar abertura de chamado, pesquisa de orientação e pergunta de esclarecimento.
