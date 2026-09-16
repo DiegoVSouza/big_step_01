@@ -62,7 +62,9 @@ class HealthResponse(BaseModel):
 
 
 class ToolFailure(Exception):
-    pass
+    def __init__(self, message: str, status_code: int | None = None):
+        super().__init__(message)
+        self.status_code = status_code
 
 
 async def call_external(method: str, path: str, payload: dict[str, Any]) -> dict[str, Any]:
@@ -84,7 +86,8 @@ async def call_external(method: str, path: str, payload: dict[str, Any]) -> dict
         except httpx.HTTPStatusError as error:
             if 400 <= error.response.status_code < 500:
                 raise ToolFailure(
-                    f"external system rejected the request: {error.response.status_code}"
+                    f"external system rejected the request: {error.response.status_code}",
+                    status_code=error.response.status_code,
                 ) from error
             last_error = error
         except (httpx.TimeoutException, httpx.NetworkError, ToolFailure) as error:
@@ -100,6 +103,11 @@ async def call_external(method: str, path: str, payload: dict[str, Any]) -> dict
 
 async def lookup_customer(email: str) -> Customer:
     response = await call_external("POST", "/customers/lookup", {"email": email})
+    return Customer.model_validate(response)
+
+
+async def create_customer(email: str, name: str) -> Customer:
+    response = await call_external("POST", "/customers", {"email": email, "name": name})
     return Customer.model_validate(response)
 
 
@@ -273,3 +281,67 @@ async def create_run(body: TicketRequest) -> AgentResult:
 
 
 
+
+from .chat import ChatRequest, ChatResponse, run_chat
+
+
+@app.post("/chat", response_model=ChatResponse)
+async def chat(body: ChatRequest) -> ChatResponse:
+    try:
+        return await run_chat(body)
+    except ToolFailure as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
+
+
+class KnowledgeArticle(BaseModel):
+    id: str
+    title: str
+    summary: str
+    tags: list[str]
+
+
+class KnowledgeSearchResponse(BaseModel):
+    articles: list[KnowledgeArticle]
+
+
+async def search_help_articles(query: str) -> KnowledgeSearchResponse:
+    response = await call_external("POST", "/knowledge/search", {"query": query})
+    return KnowledgeSearchResponse.model_validate(response)
+
+
+TOOLS.append({
+    "type": "function",
+    "function": {
+        "name": "search_help_articles",
+        "description": "Search internal support articles for a useful troubleshooting step before opening a ticket.",
+        "parameters": {
+            "type": "object",
+            "properties": {"query": {"type": "string", "minLength": 3}},
+            "required": ["query"],
+            "additionalProperties": False,
+        },
+    },
+})
+
+
+
+
+
+
+
+TOOLS.append({
+    "type": "function",
+    "function": {
+        "name": "create_customer",
+        "description": "Create a customer after the user explicitly asks to register an unknown email.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "email": {"type": "string", "format": "email"},
+                "name": {"type": "string", "minLength": 2},
+            },
+            "required": ["email", "name"],
+            "additionalProperties": False,
+        },
+    },
+})
