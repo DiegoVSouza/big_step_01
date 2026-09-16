@@ -22,7 +22,14 @@ function Get-DotEnvValue([string]$Name) {
 }
 
 function New-Secret {
-    return [Convert]::ToHexString([System.Security.Cryptography.RandomNumberGenerator]::GetBytes(24))
+    $bytes = New-Object byte[] 24
+    $generator = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+    try {
+        $generator.GetBytes($bytes)
+    } finally {
+        $generator.Dispose()
+    }
+    return [BitConverter]::ToString($bytes).Replace("-", "")
 }
 
 function Ensure-App([string]$Name) {

@@ -157,7 +157,14 @@ class AgentTests(unittest.TestCase):
             created_at=datetime.now(timezone.utc),
         )
         search_response = main.KnowledgeSearchResponse(articles=[article])
-        with patch.object(main, "search_help_articles", new=AsyncMock(return_value=search_response)), \
+        llm_responses = FakeOpenAI([
+            FakeCompletion(FakeMessage([FakeToolCall("search_help_articles", '{"query":"acesso portal"}')])),
+            FakeCompletion(FakeMessage([FakeToolCall("lookup_customer", '{"email":"novo@example.com"}')])),
+            FakeCompletion(FakeMessage([FakeToolCall("create_customer", '{"email":"novo@example.com","name":"Novo"}')])),
+            FakeCompletion(FakeMessage([FakeToolCall("create_ticket", ('{"customer_id":"%s","title":"Redefinir acesso","description":"novo@example.com não consegue acessar o portal e isso é urgente.","priority":"high"}' % customer.id))])), 
+        ])
+        with patch.object(main, "openai_client", return_value=llm_responses), \
+             patch.object(main, "search_help_articles", new=AsyncMock(return_value=search_response)), \
              patch.object(main, "lookup_customer", new=AsyncMock(side_effect=main.ToolFailure("not found", status_code=404))), \
              patch.object(main, "create_customer", new=AsyncMock(return_value=customer)), \
              patch.object(main, "create_ticket", new=AsyncMock(return_value=ticket)):
@@ -181,6 +188,18 @@ class AgentTests(unittest.TestCase):
                     priority="high",
                 )))
 
+    def test_guidance_request_still_calls_llm(self):
+        from agent.chat import ChatRequest, run_chat
+
+        article = main.KnowledgeArticle(id="KB-001", title="Redefinir acesso", summary="Confirme o e-mail.", tags=["senha"])
+        llm = FakeOpenAI([
+            FakeCompletion(FakeMessage([FakeToolCall("search_help_articles", '{"query":"senha portal"}')]))
+        ])
+        with patch.object(main, "openai_client", return_value=llm), \
+             patch.object(main, "search_help_articles", new=AsyncMock(return_value=main.KnowledgeSearchResponse(articles=[article]))):
+            result = asyncio.run(run_chat(ChatRequest(message="Como resolvo minha senha? Ainda não preciso de ticket.")))
+        self.assertEqual(result.tools_called, ["search_help_articles"])
+        self.assertEqual(result.usage.total_tokens, 15)
 
 if __name__ == "__main__":
     unittest.main()
